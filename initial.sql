@@ -287,3 +287,130 @@ select code, date_idx
 
 from tier2.technical_indicator;
 
+-- View: tier2.vw_technical_indicator
+
+-- DROP VIEW tier2.vw_technical_indicator;
+
+CREATE OR REPLACE VIEW tier2.vw_technical_indicator
+ AS
+ SELECT code,
+    date_idx::integer AS date_idx,
+        CASE
+            WHEN xema::text = 'NaN'::text THEN NULL::numeric
+            ELSE xema::numeric(20,4)
+        END AS xema,
+        CASE
+            WHEN sema::text = 'NaN'::text THEN NULL::numeric
+            ELSE sema::numeric(20,4)
+        END AS sema,
+        CASE
+            WHEN lema::text = 'NaN'::text THEN NULL::numeric
+            ELSE lema::numeric(20,4)
+        END AS lema,
+        CASE
+            WHEN tema::text = 'NaN'::text THEN NULL::numeric
+            ELSE tema::numeric(20,4)
+        END AS tema,
+        CASE
+            WHEN macd::text = 'NaN'::text THEN NULL::numeric
+            ELSE macd::numeric(20,4)
+        END AS macd,
+        CASE
+            WHEN psar::text = 'NaN'::text THEN NULL::numeric
+            ELSE psar::numeric(20,4)
+        END AS psar,
+        CASE
+            WHEN scmo::text = 'NaN'::text THEN NULL::numeric
+            ELSE scmo::numeric(20,4)
+        END AS scmo,
+        CASE
+            WHEN lcmo::text = 'NaN'::text THEN NULL::numeric
+            ELSE lcmo::numeric(20,4)
+        END AS lcmo,
+        CASE
+            WHEN srsi::text = 'NaN'::text THEN NULL::numeric
+            ELSE srsi::numeric(20,4)
+        END AS srsi,
+        CASE
+            WHEN lrsi::text = 'NaN'::text THEN NULL::numeric
+            ELSE lrsi::numeric(20,4)
+        END AS lrsi,
+        CASE
+            WHEN srsisema::text = 'NaN'::text THEN NULL::numeric
+            ELSE srsisema::numeric(20,4)
+        END AS srsisema,
+        CASE
+            WHEN srsilema::text = 'NaN'::text THEN NULL::numeric
+            ELSE srsilema::numeric(20,4)
+        END AS srsilema,
+        CASE
+            WHEN lrsisema::text = 'NaN'::text THEN NULL::numeric
+            ELSE lrsisema::numeric(20,4)
+        END AS lrsisema,
+        CASE
+            WHEN lrsilema::text = 'NaN'::text THEN NULL::numeric
+            ELSE lrsilema::numeric(20,4)
+        END AS lrsilema,
+        CASE
+            WHEN scci::text = 'NaN'::text THEN NULL::numeric
+            ELSE scci::numeric(20,4)
+        END AS scci,
+        CASE
+            WHEN lcci::text = 'NaN'::text THEN NULL::numeric
+            ELSE lcci::numeric(20,4)
+        END AS lcci,
+        CASE
+            WHEN stck::text = 'NaN'::text THEN NULL::numeric
+            ELSE stck::numeric(20,4)
+        END AS stck,
+        CASE
+            WHEN stcd::text = 'NaN'::text THEN NULL::numeric
+            ELSE stcd::numeric(20,4)
+        END AS stcd,
+        CASE
+            WHEN cpcv::text = 'NaN'::text THEN NULL::numeric
+            ELSE cpcv::numeric(20,4)
+        END AS cpcv,
+        CASE
+            WHEN sdpo::text = 'NaN'::text THEN NULL::numeric
+            ELSE sdpo::numeric(20,4)
+        END AS sdpo,
+        CASE
+            WHEN ldpo::text = 'NaN'::text THEN NULL::numeric
+            ELSE ldpo::numeric(20,4)
+        END AS ldpo,
+        CASE
+            WHEN gppo::text = 'NaN'::text THEN NULL::numeric
+            ELSE gppo::numeric(20,4)
+        END AS gppo,
+        CASE
+            WHEN sroc::text = 'NaN'::text THEN NULL::numeric
+            ELSE sroc::numeric(20,4)
+        END AS sroc,
+        CASE
+            WHEN lorc::text = 'NaN'::text THEN NULL::numeric
+            ELSE lorc::numeric(20,4)
+        END AS lorc,
+        CASE
+            WHEN sadx::text = 'NaN'::text THEN NULL::numeric
+            ELSE sadx::numeric(20,4)
+        END AS sadx,
+        CASE
+            WHEN ladx::text = 'NaN'::text THEN NULL::numeric
+            ELSE ladx::numeric(20,4)
+        END AS ladx,
+        CASE
+            WHEN sstrsi::text = 'NaN'::text THEN NULL::numeric
+            ELSE sstrsi::numeric(20,4)
+        END AS sstrsi,
+        CASE
+            WHEN lstrsi::text = 'NaN'::text THEN NULL::numeric
+            ELSE lstrsi::numeric(20,4)
+        END AS lstrsi
+   FROM tier2.technical_indicator;
+
+ALTER TABLE tier2.vw_technical_indicator
+    OWNER TO postgres;
+
+
+
