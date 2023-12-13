@@ -1,0 +1,494 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.1
+-- Dumped by pg_dump version 16.0
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: tier1; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA tier1;
+
+
+--
+-- Name: tier2; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA tier2;
+
+
+--
+-- Name: calculate_heikin_ashi(character varying); Type: FUNCTION; Schema: tier1; Owner: -
+--
+
+CREATE FUNCTION tier1.calculate_heikin_ashi(input_code character varying) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+
+DROP TABLE IF EXISTS temp_org_price;
+CREATE temp TABLE temp_org_price AS
+	SELECT * FROM tier1.vw_full_code_history
+	WHERE code = input_code;
+DROP TABLE IF EXISTS temp_heikin_ashi ;
+CREATE TEMP TABLE temp_heikin_ashi AS
+WITH recursive heikin_ashi_calculate AS (
+	SELECT code, date, OPEN, high, low, CLOSE, volume,
+	round((OPEN +CLOSE) / 2, 3) AS ha_open,
+	round((OPEN + high + low +CLOSE) / 4, 3) AS ha_high,
+	round((OPEN + high + low +CLOSE) / 4, 3) AS ha_low,
+	round((OPEN + high + low +CLOSE) / 4, 3) AS ha_close,
+	volume AS ha_volume, idx
+	FROM temp_org_price WHERE idx = 1
+	UNION
+	SELECT fh.code, fh.date, fh.OPEN, fh.high, fh.low, fh.CLOSE, fh.volume,
+		round((ec.ha_open + ec.ha_close) / 2, 3) AS ha_open,
+		greatest(fh.high, round((ec.ha_open + ec.ha_close) / 2, 3), round((fh.OPEN + fh.high + fh.low + fh.CLOSE) / 4, 3)) AS ha_high,
+		least(fh.low, round((ec.ha_open     + ec.ha_close) / 2, 3), round((fh.OPEN + fh.high + fh.low + fh.CLOSE) / 4, 3)) AS ha_low,
+		round((fh.OPEN + fh.high + fh.low + fh.CLOSE) / 4, 3) AS ha_close,
+		fh.volume AS ha_volume, fh.idx
+	FROM heikin_ashi_calculate AS ec
+	INNER JOIN temp_org_price AS fh
+	ON ec.code = fh.code AND ec.idx = fh.idx-1 )
+SELECT code, date, OPEN, high, low, CLOSE, volume, ha_open, ha_high, ha_low, ha_close, ha_volume, idx
+FROM heikin_ashi_calculate;
+
+insert into tier2.heikin_ashi
+select code, date, idx, ha_open, ha_high, ha_low, ha_close
+from temp_heikin_ashi;
+
+END;
+$$;
+
+
+--
+-- Name: reformat_eavt(character varying, character varying, integer); Type: FUNCTION; Schema: tier2; Owner: -
+--
+
+CREATE FUNCTION tier2.reformat_eavt(symbol character varying, attribute character varying, len integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    query_text text;
+BEGIN
+
+ query_text := FORMAT('
+insert into tier2.eavt_source
+WITH list AS (
+	SELECT i.code,
+		i.date_idx AS rec_dt,
+		t.date_idx AS t_dt,
+		t.%s AS prc
+	FROM tier2.vw_technical_indicator i
+    JOIN tier2.vw_technical_indicator t ON i.code::text = t.code::text
+	WHERE i.date_idx::integer >= t.date_idx::integer AND i.date_idx::integer <= (t.date_idx::integer + %s -1) AND i.code::text = ''%s''::text
+), output AS (
+	SELECT list.code,
+		list.rec_dt,
+		array_agg(list.prc ORDER BY (list.t_dt::integer)) AS val
+	FROM list
+	GROUP BY list.code, list.rec_dt
+	ORDER BY list.code, (list.rec_dt::integer)
+)
+ SELECT o.code as entity,
+ 	cast (o.rec_dt as integer) as record_date,
+    o.val as evaluation,
+    ''%s'' as attribute,
+	%s as len
+   FROM output o
+  WHERE array_length(o.val, 1) = %s
+  ORDER BY (o.rec_dt::integer)
+    ', attribute, len, symbol, attribute, len, len);
+
+EXECUTE query_text;
+END;
+$$;
+
+
+--
+-- Name: code_list; Type: TABLE; Schema: tier1; Owner: -
+--
+
+CREATE TABLE tier1.code_list (
+    id character varying,
+    code character varying(100),
+    market_cap character varying(100),
+    sys_load_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: full_code_history; Type: TABLE; Schema: tier1; Owner: -
+--
+
+CREATE TABLE tier1.full_code_history (
+    code character varying,
+    date character varying,
+    open numeric,
+    high numeric,
+    low numeric,
+    close numeric,
+    volume numeric
+);
+
+
+--
+-- Name: index_list; Type: TABLE; Schema: tier1; Owner: -
+--
+
+CREATE TABLE tier1.index_list (
+    idx character varying(100),
+    comment character varying(500),
+    sys_load_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: short; Type: TABLE; Schema: tier1; Owner: -
+--
+
+CREATE TABLE tier1.short (
+    company_full_name character varying(100),
+    product_code character varying(30),
+    short_position character varying(100),
+    total_in_issue character varying(100),
+    reported_position character varying(100),
+    sys_load_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: vw_full_code_history; Type: VIEW; Schema: tier1; Owner: -
+--
+
+CREATE VIEW tier1.vw_full_code_history AS
+ SELECT code,
+    to_date((date)::text, 'MM/DD/YY'::text) AS date,
+    (open)::numeric(10,3) AS open,
+    (high)::numeric(10,3) AS high,
+    (low)::numeric(10,3) AS low,
+    (close)::numeric(10,3) AS close,
+    (volume)::numeric(20,0) AS volume,
+    row_number() OVER (PARTITION BY code ORDER BY (to_date((date)::text, 'MM/DD/YY'::text))) AS idx
+   FROM tier1.full_code_history;
+
+
+--
+-- Name: vw_top_trading; Type: VIEW; Schema: tier1; Owner: -
+--
+
+CREATE VIEW tier1.vw_top_trading AS
+ WITH temp AS (
+         SELECT EXTRACT(month FROM vw_full_code_history.date) AS month,
+            EXTRACT(year FROM vw_full_code_history.date) AS year,
+            vw_full_code_history.code,
+            sum((((vw_full_code_history.high + vw_full_code_history.low) / (2)::numeric) * vw_full_code_history.volume)) AS flow
+           FROM tier1.vw_full_code_history
+          GROUP BY (EXTRACT(month FROM vw_full_code_history.date)), (EXTRACT(year FROM vw_full_code_history.date)), vw_full_code_history.code
+        ), list AS (
+         SELECT temp.month,
+            temp.year,
+            temp.code,
+            row_number() OVER (PARTITION BY temp.month, temp.year ORDER BY temp.flow DESC) AS rnum
+           FROM temp
+        )
+ SELECT month,
+    year,
+    code,
+        CASE
+            WHEN (rnum <= 20) THEN 1
+            ELSE 0
+        END AS is_top20,
+        CASE
+            WHEN (rnum <= 50) THEN 1
+            ELSE 0
+        END AS is_top50,
+        CASE
+            WHEN (rnum <= 100) THEN 1
+            ELSE 0
+        END AS is_top100,
+        CASE
+            WHEN (rnum <= 200) THEN 1
+            ELSE 0
+        END AS is_top200
+   FROM list
+  WHERE (rnum <= 300);
+
+
+--
+-- Name: vw_sub_code_history; Type: VIEW; Schema: tier1; Owner: -
+--
+
+CREATE VIEW tier1.vw_sub_code_history AS
+ SELECT code,
+    date,
+    open,
+    high,
+    low,
+    close,
+    volume,
+    idx
+   FROM tier1.vw_full_code_history
+  WHERE ((code)::text IN ( SELECT vw_top_trading.code
+           FROM tier1.vw_top_trading
+          GROUP BY vw_top_trading.code));
+
+
+--
+-- Name: eavt_source; Type: TABLE; Schema: tier2; Owner: -
+--
+
+CREATE TABLE tier2.eavt_source (
+    entity character varying(100),
+    idx integer,
+    evaluation character varying[],
+    attribute text,
+    len integer
+);
+
+
+--
+-- Name: eavt_target; Type: TABLE; Schema: tier2; Owner: -
+--
+
+CREATE TABLE tier2.eavt_target (
+    symbol character varying,
+    date_index character varying,
+    lens character varying,
+    attr character varying,
+    dgr character varying,
+    vle jsonb
+);
+
+
+--
+-- Name: heikin_ashi; Type: TABLE; Schema: tier2; Owner: -
+--
+
+CREATE TABLE tier2.heikin_ashi (
+    code character varying,
+    date date,
+    idx bigint,
+    ha_open numeric(15,3),
+    ha_high numeric(15,3),
+    ha_low numeric(15,3),
+    ha_close numeric(15,3)
+);
+
+
+--
+-- Name: technical_indicator; Type: TABLE; Schema: tier2; Owner: -
+--
+
+CREATE TABLE tier2.technical_indicator (
+    code character varying(100),
+    date_idx character varying(100),
+    xema character varying(100),
+    sema character varying(100),
+    lema character varying(100),
+    tema character varying(100),
+    macd character varying(100),
+    psar character varying(100),
+    scmo character varying(100),
+    lcmo character varying(100),
+    srsi character varying(100),
+    lrsi character varying(100),
+    srsisema character varying(100),
+    srsilema character varying(100),
+    lrsisema character varying(100),
+    lrsilema character varying(100),
+    scci character varying(100),
+    lcci character varying(100),
+    stck character varying(100),
+    stcd character varying(100),
+    cpcv character varying(100),
+    sdpo character varying(100),
+    ldpo character varying(100),
+    gppo character varying(100),
+    sroc character varying(100),
+    lorc character varying(100),
+    sadx character varying(100),
+    ladx character varying(100),
+    sstrsi character varying(100),
+    lstrsi character varying(100)
+);
+
+
+--
+-- Name: transform_indicator; Type: VIEW; Schema: tier2; Owner: -
+--
+
+CREATE VIEW tier2.transform_indicator AS
+ SELECT code,
+    date_idx,
+        CASE
+            WHEN ((sema)::text >= (lema)::text) THEN 1
+            ELSE 0
+        END AS s_l_ema
+   FROM tier2.technical_indicator;
+
+
+--
+-- Name: vw_heikin_ashi_type; Type: VIEW; Schema: tier2; Owner: -
+--
+
+CREATE VIEW tier2.vw_heikin_ashi_type AS
+ SELECT code,
+    date,
+    idx,
+        CASE
+            WHEN (ha_open < ha_close) THEN 1
+            WHEN (ha_open > ha_close) THEN '-1'::integer
+            WHEN (ha_open = ha_close) THEN 0
+            ELSE NULL::integer
+        END AS ha_movement,
+        CASE
+            WHEN (ha_high = ha_open) THEN 1
+            ELSE 0
+        END AS strong_down,
+        CASE
+            WHEN (ha_low = ha_open) THEN 1
+            ELSE 0
+        END AS strong_up
+   FROM tier2.heikin_ashi;
+
+
+--
+-- Name: vw_technical_indicator; Type: VIEW; Schema: tier2; Owner: -
+--
+
+CREATE VIEW tier2.vw_technical_indicator AS
+ SELECT code,
+    (date_idx)::integer AS date_idx,
+        CASE
+            WHEN ((xema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (xema)::numeric(20,4)
+        END AS xema,
+        CASE
+            WHEN ((sema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (sema)::numeric(20,4)
+        END AS sema,
+        CASE
+            WHEN ((lema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lema)::numeric(20,4)
+        END AS lema,
+        CASE
+            WHEN ((tema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (tema)::numeric(20,4)
+        END AS tema,
+        CASE
+            WHEN ((macd)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (macd)::numeric(20,4)
+        END AS macd,
+        CASE
+            WHEN ((psar)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (psar)::numeric(20,4)
+        END AS psar,
+        CASE
+            WHEN ((scmo)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (scmo)::numeric(20,4)
+        END AS scmo,
+        CASE
+            WHEN ((lcmo)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lcmo)::numeric(20,4)
+        END AS lcmo,
+        CASE
+            WHEN ((srsi)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (srsi)::numeric(20,4)
+        END AS srsi,
+        CASE
+            WHEN ((lrsi)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lrsi)::numeric(20,4)
+        END AS lrsi,
+        CASE
+            WHEN ((srsisema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (srsisema)::numeric(20,4)
+        END AS srsisema,
+        CASE
+            WHEN ((srsilema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (srsilema)::numeric(20,4)
+        END AS srsilema,
+        CASE
+            WHEN ((lrsisema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lrsisema)::numeric(20,4)
+        END AS lrsisema,
+        CASE
+            WHEN ((lrsilema)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lrsilema)::numeric(20,4)
+        END AS lrsilema,
+        CASE
+            WHEN ((scci)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (scci)::numeric(20,4)
+        END AS scci,
+        CASE
+            WHEN ((lcci)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lcci)::numeric(20,4)
+        END AS lcci,
+        CASE
+            WHEN ((stck)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (stck)::numeric(20,4)
+        END AS stck,
+        CASE
+            WHEN ((stcd)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (stcd)::numeric(20,4)
+        END AS stcd,
+        CASE
+            WHEN ((cpcv)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (cpcv)::numeric(20,4)
+        END AS cpcv,
+        CASE
+            WHEN ((sdpo)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (sdpo)::numeric(20,4)
+        END AS sdpo,
+        CASE
+            WHEN ((ldpo)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (ldpo)::numeric(20,4)
+        END AS ldpo,
+        CASE
+            WHEN ((gppo)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (gppo)::numeric(20,4)
+        END AS gppo,
+        CASE
+            WHEN ((sroc)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (sroc)::numeric(20,4)
+        END AS sroc,
+        CASE
+            WHEN ((lorc)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lorc)::numeric(20,4)
+        END AS lorc,
+        CASE
+            WHEN ((sadx)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (sadx)::numeric(20,4)
+        END AS sadx,
+        CASE
+            WHEN ((ladx)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (ladx)::numeric(20,4)
+        END AS ladx,
+        CASE
+            WHEN ((sstrsi)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (sstrsi)::numeric(20,4)
+        END AS sstrsi,
+        CASE
+            WHEN ((lstrsi)::text = 'NaN'::text) THEN NULL::numeric
+            ELSE (lstrsi)::numeric(20,4)
+        END AS lstrsi
+   FROM tier2.technical_indicator;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
