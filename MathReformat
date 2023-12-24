@@ -1,0 +1,550 @@
+create table tier2.eavt_target_05 
+as select * from tier2.eavt_target
+where lens = '5';
+
+create table tier2.eavt_target_10
+as select * from tier2.eavt_target
+where lens = '10';
+
+create table tier2.eavt_target_25
+as select * from tier2.eavt_target
+where lens = '25';
+
+create table tier2.eavt_target_50
+as select * from tier2.eavt_target
+where lens = '50';
+
+drop table if exists code_idx;
+create temp table code_idx as 
+select code, date, idx from tier1.vw_sub_code_history;
+create index temp_ci_idx on code_idx (code, idx);
+
+
+drop table if exists temp_xl;
+create temp table temp_xl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'xema' and dgr = 'linear';	
+create index temp_xl_idx on temp_xl(code, date_index);
+
+drop table if exists temp_sl;
+create temp table temp_sl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'sema' and dgr = 'linear';	
+create index temp_sl_idx on temp_sl(code, date_index);
+
+drop table if exists temp_ll;
+create temp table temp_ll as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'lema' and dgr = 'linear';	
+create index temp_ll_idx on temp_ll(code, date_index);
+	
+drop table if exists temp_tl;
+create temp table temp_tl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'tema' and dgr = 'linear';	
+create index temp_tl_idx on temp_tl(code, date_index);	
+	
+drop table if exists temp_xq;
+create temp table temp_xq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'xema' and dgr = 'quadratic';
+create index temp_xq_idx on temp_xq(code, date_index);
+
+drop table if exists temp_sq;
+create temp table temp_sq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'sema' and dgr = 'quadratic';
+create index temp_sq_idx on temp_sq(code, date_index);
+
+drop table if exists temp_lq;
+create temp table temp_lq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'lema' and dgr = 'quadratic';
+create index temp_lq_idx on temp_lq(code, date_index);
+
+drop table if exists temp_tq;
+create temp table temp_tq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_05 
+where attr = 'tema' and dgr = 'quadratic';
+create index temp_tq_idx on temp_tq(code, date_index);
+
+drop table if exists temp_q05;
+create temp table temp_q05 as 
+select i.code, i.date, i.idx
+, t1.extr as extr_xq05, t1.trend as trend_xq05
+, t2.extr as extr_sq05, t2.trend as trend_sq05
+, t3.extr as extr_lq05, t3.trend as trend_lq05
+, t4.extr as extr_tq05, t4.trend as trend_tq05
+from code_idx i
+left outer join temp_xq t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sq t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_lq t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tq t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_q05_idx on temp_q05(code,idx);
+
+drop table if exists temp_l05;
+create temp table temp_l05 as 
+select i.code, i.date, i.idx
+, t1.trend as trend_xl05
+, t2.trend as trend_sl05
+, t3.trend as trend_ll05
+, t4.trend as trend_tl05
+from code_idx i
+left outer join temp_xl t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sl t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_ll t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tl t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_l05_idx on temp_l05(code,idx);
+
+
+
+drop table if exists temp_xl;
+create temp table temp_xl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'xema' and dgr = 'linear';	
+create index temp_xl_idx on temp_xl(code, date_index);
+
+drop table if exists temp_sl;
+create temp table temp_sl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'sema' and dgr = 'linear';	
+create index temp_sl_idx on temp_sl(code, date_index);
+
+drop table if exists temp_ll;
+create temp table temp_ll as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'lema' and dgr = 'linear';	
+create index temp_ll_idx on temp_ll(code, date_index);
+	
+drop table if exists temp_tl;
+create temp table temp_tl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'tema' and dgr = 'linear';	
+create index temp_tl_idx on temp_tl(code, date_index);	
+	
+drop table if exists temp_xq;
+create temp table temp_xq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'xema' and dgr = 'quadratic';
+create index temp_xq_idx on temp_xq(code, date_index);
+
+drop table if exists temp_sq;
+create temp table temp_sq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'sema' and dgr = 'quadratic';
+create index temp_sq_idx on temp_sq(code, date_index);
+
+drop table if exists temp_lq;
+create temp table temp_lq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'lema' and dgr = 'quadratic';
+create index temp_lq_idx on temp_lq(code, date_index);
+
+drop table if exists temp_tq;
+create temp table temp_tq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_10 
+where attr = 'tema' and dgr = 'quadratic';
+create index temp_tq_idx on temp_tq(code, date_index);
+
+drop table if exists temp_q10;
+create temp table temp_q10 as 
+select i.code, i.date, i.idx
+, t1.extr as extr_xq10, t1.trend as trend_xq10
+, t2.extr as extr_sq10, t2.trend as trend_sq10
+, t3.extr as extr_lq10, t3.trend as trend_lq10
+, t4.extr as extr_tq10, t4.trend as trend_tq10
+from code_idx i
+left outer join temp_xq t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sq t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_lq t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tq t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_q10_idx on temp_q10(code,idx);
+
+drop table if exists temp_l10;
+create temp table temp_l10 as 
+select i.code, i.date, i.idx
+, t1.trend as trend_xl10
+, t2.trend as trend_sl10
+, t3.trend as trend_ll10
+, t4.trend as trend_tl10
+from code_idx i
+left outer join temp_xl t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sl t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_ll t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tl t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_l10_idx on temp_l10(code,idx);
+
+
+
+drop table if exists temp_xl;
+create temp table temp_xl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'xema' and dgr = 'linear';	
+create index temp_xl_idx on temp_xl(code, date_index);
+
+drop table if exists temp_sl;
+create temp table temp_sl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'sema' and dgr = 'linear';	
+create index temp_sl_idx on temp_sl(code, date_index);
+
+drop table if exists temp_ll;
+create temp table temp_ll as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'lema' and dgr = 'linear';	
+create index temp_ll_idx on temp_ll(code, date_index);
+	
+drop table if exists temp_tl;
+create temp table temp_tl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'tema' and dgr = 'linear';	
+create index temp_tl_idx on temp_tl(code, date_index);	
+	
+drop table if exists temp_xq;
+create temp table temp_xq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'xema' and dgr = 'quadratic';
+create index temp_xq_idx on temp_xq(code, date_index);
+
+drop table if exists temp_sq;
+create temp table temp_sq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'sema' and dgr = 'quadratic';
+create index temp_sq_idx on temp_sq(code, date_index);
+
+drop table if exists temp_lq;
+create temp table temp_lq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'lema' and dgr = 'quadratic';
+create index temp_lq_idx on temp_lq(code, date_index);
+
+drop table if exists temp_tq;
+create temp table temp_tq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_25 
+where attr = 'tema' and dgr = 'quadratic';
+create index temp_tq_idx on temp_tq(code, date_index);
+
+drop table if exists temp_q25;
+create temp table temp_q25 as 
+select i.code, i.date, i.idx
+, t1.extr as extr_xq25, t1.trend as trend_xq25
+, t2.extr as extr_sq25, t2.trend as trend_sq25
+, t3.extr as extr_lq25, t3.trend as trend_lq25
+, t4.extr as extr_tq25, t4.trend as trend_tq25
+from code_idx i
+left outer join temp_xq t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sq t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_lq t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tq t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_q25_idx on temp_q25(code,idx);
+
+drop table if exists temp_l25;
+create temp table temp_l25 as 
+select i.code, i.date, i.idx
+, t1.trend as trend_xl25
+, t2.trend as trend_sl25
+, t3.trend as trend_ll25
+, t4.trend as trend_tl25
+from code_idx i
+left outer join temp_xl t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sl t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_ll t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tl t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_l25_idx on temp_l25(code,idx);
+
+
+
+drop table if exists temp_xl;
+create temp table temp_xl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'xema' and dgr = 'linear';	
+create index temp_xl_idx on temp_xl(code, date_index);
+
+drop table if exists temp_sl;
+create temp table temp_sl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'sema' and dgr = 'linear';	
+create index temp_sl_idx on temp_sl(code, date_index);
+
+drop table if exists temp_ll;
+create temp table temp_ll as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'lema' and dgr = 'linear';	
+create index temp_ll_idx on temp_ll(code, date_index);
+	
+drop table if exists temp_tl;
+create temp table temp_tl as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, cast(vle ->1 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'tema' and dgr = 'linear';	
+create index temp_tl_idx on temp_tl(code, date_index);	
+	
+drop table if exists temp_xq;
+create temp table temp_xq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'xema' and dgr = 'quadratic';
+create index temp_xq_idx on temp_xq(code, date_index);
+
+drop table if exists temp_sq;
+create temp table temp_sq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'sema' and dgr = 'quadratic';
+create index temp_sq_idx on temp_sq(code, date_index);
+
+drop table if exists temp_lq;
+create temp table temp_lq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'lema' and dgr = 'quadratic';
+create index temp_lq_idx on temp_lq(code, date_index);
+
+drop table if exists temp_tq;
+create temp table temp_tq as 
+select symbol as code 
+	, cast(date_index as int ) date_index
+	, 0- cast(vle ->1 as numeric)/2* cast(vle ->2 as numeric)  as extr
+	, cast(vle ->2 as numeric) as trend
+from tier2.eavt_target_50 
+where attr = 'tema' and dgr = 'quadratic';
+create index temp_tq_idx on temp_tq(code, date_index);
+
+drop table if exists temp_q50;
+create temp table temp_q50 as 
+select i.code, i.date, i.idx
+, t1.extr as extr_xq50, t1.trend as trend_xq50
+, t2.extr as extr_sq50, t2.trend as trend_sq50
+, t3.extr as extr_lq50, t3.trend as trend_lq50
+, t4.extr as extr_tq50, t4.trend as trend_tq50
+from code_idx i
+left outer join temp_xq t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sq t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_lq t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tq t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_q50_idx on temp_q50(code,idx);
+
+drop table if exists temp_l50;
+create temp table temp_l50 as 
+select i.code, i.date, i.idx
+, t1.trend as trend_xl50
+, t2.trend as trend_sl50
+, t3.trend as trend_ll50
+, t4.trend as trend_tl50
+from code_idx i
+left outer join temp_xl t1
+on i.code = t1.code and i.idx = t1.date_index
+left outer join temp_sl t2
+on i.code = t2.code and i.idx = t2.date_index
+left outer join temp_ll t3
+on i.code = t3.code and i.idx = t3.date_index
+left outer join temp_tl t4
+on i.code = t4.code and i.idx = t4.date_index;
+create index temp_l50_idx on temp_l50(code,idx);
+
+drop table if exists tier2.match_indicator_linear;
+create table tier2.match_indicator_linear as 
+select i.code, i.date, i.idx
+, l05.trend_xl05 as trend_xema_linear_05
+, l05.trend_sl05 as trend_sema_linear_05
+, l05.trend_ll05 as trend_lema_linear_05
+, l05.trend_tl05 as trend_tema_linear_05
+, l10.trend_xl10 as trend_xema_linear_10
+, l10.trend_sl10 as trend_sema_linear_10
+, l10.trend_ll10 as trend_lema_linear_10
+, l10.trend_tl10 as trend_tema_linear_10
+, l25.trend_xl25 as trend_xema_linear_25
+, l25.trend_sl25 as trend_sema_linear_25
+, l25.trend_ll25 as trend_lema_linear_25
+, l25.trend_tl25 as trend_tema_linear_25
+, l50.trend_xl50 as trend_xema_linear_50
+, l50.trend_sl50 as trend_sema_linear_50
+, l50.trend_ll50 as trend_lema_linear_50
+, l50.trend_tl50 as trend_tema_linear_50
+from code_idx i
+left outer join temp_l05 l05
+on i.code = l05.code and i.idx = l05.idx
+left outer join temp_l10 l10
+on i.code = l10.code and i.idx = l10.idx
+left outer join temp_l25 l25
+on i.code = l25.code and i.idx = l25.idx
+left outer join temp_l50 l50
+on i.code = l50.code and i.idx = l50.idx;
+
+drop table if exists tier2.match_indicator_quadratic;
+create table tier2.match_indicator_quadratic as 
+select i.code, i.date, i.idx
+, q05.extr_xq05 as extreme_xema_quadratic_05
+, q05.trend_xq05 as trend_xema_quadratic_05
+, q05.extr_sq05 as extreme_sema_quadratic_05
+, q05.trend_sq05 as trend_sema_quadratic_05
+, q05.extr_lq05 as extreme_lema_quadratic_05
+, q05.trend_lq05 as trend_lema_quadratic_05
+, q05.extr_tq05 as extreme_tema_quadratic_05
+, q05.trend_tq05 as trend_tema_quadratic_05
+, q10.extr_xq10 as extreme_xema_quadratic_10
+, q10.trend_xq10 as trend_xema_quadratic_10
+, q10.extr_sq10 as extreme_sema_quadratic_10
+, q10.trend_sq10 as trend_sema_quadratic_10
+, q10.extr_lq10 as extreme_lema_quadratic_10
+, q10.trend_lq10 as trend_lema_quadratic_10
+, q10.extr_tq10 as extreme_tema_quadratic_10
+, q10.trend_tq10 as trend_tema_quadratic_10
+, q25.extr_xq25 as extreme_xema_quadratic_25
+, q25.trend_xq25 as trend_xema_quadratic_25
+, q25.extr_sq25 as extreme_sema_quadratic_25
+, q25.trend_sq25 as trend_sema_quadratic_25
+, q25.extr_lq25 as extreme_lema_quadratic_25
+, q25.trend_lq25 as trend_lema_quadratic_25
+, q25.extr_tq25 as extreme_tema_quadratic_25
+, q25.trend_tq25 as trend_tema_quadratic_25
+, q50.extr_xq50 as extreme_xema_quadratic_50
+, q50.trend_xq50 as trend_xema_quadratic_50
+, q50.extr_sq50 as extreme_sema_quadratic_50
+, q50.trend_sq50 as trend_sema_quadratic_50
+, q50.extr_lq50 as extreme_lema_quadratic_50
+, q50.trend_lq50 as trend_lema_quadratic_50
+, q50.extr_tq50 as extreme_tema_quadratic_50
+, q50.trend_tq50 as trend_tema_quadratic_50
+
+from code_idx i
+left outer join temp_q05 q05
+on i.code = q05.code and i.idx = q05.idx
+left outer join temp_q10 q10
+on i.code = q10.code and i.idx = q10.idx
+left outer join temp_q25 q25
+on i.code = q25.code and i.idx = q25.idx
+left outer join temp_q50 q50
+on i.code = q50.code and i.idx = q50.idx;
