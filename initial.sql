@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS tier2.technical_indicator
     ldpo character varying(100) COLLATE pg_catalog."default",
 	gppo character varying(100) COLLATE pg_catalog."default",
 	sroc character varying(100) COLLATE pg_catalog."default",
-	lorc character varying(100) COLLATE pg_catalog."default",
+	lroc character varying(100) COLLATE pg_catalog."default",
 	sadx character varying(100) COLLATE pg_catalog."default",
 	ladx character varying(100) COLLATE pg_catalog."default",
     sstrsi character varying(100) COLLATE pg_catalog."default",
