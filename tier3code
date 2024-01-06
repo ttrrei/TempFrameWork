@@ -1,0 +1,336 @@
+-- View: tier3.status_heikin_ashi
+
+-- DROP VIEW tier3.status_heikin_ashi;
+
+CREATE OR REPLACE VIEW tier3.status_heikin_ashi
+ AS
+ WITH temp AS (
+         SELECT heikin_ashi.code,
+            heikin_ashi.date,
+            heikin_ashi.idx,
+            heikin_ashi.ha_open AS curr_open,
+            heikin_ashi.ha_high AS curr_high,
+            heikin_ashi.ha_low AS curr_low,
+            heikin_ashi.ha_close AS curr_close,
+            lag(heikin_ashi.ha_open, 1) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS last_open,
+            lag(heikin_ashi.ha_open, 2) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS prev_open,
+            lag(heikin_ashi.ha_open, 3) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS befr_open,
+            lag(heikin_ashi.ha_high, 1) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS last_high,
+            lag(heikin_ashi.ha_high, 2) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS prev_high,
+            lag(heikin_ashi.ha_high, 3) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS befr_high,
+            lag(heikin_ashi.ha_low, 1) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS last_low,
+            lag(heikin_ashi.ha_low, 2) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS prev_low,
+            lag(heikin_ashi.ha_low, 3) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS befr_low,
+            lag(heikin_ashi.ha_close, 1) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS last_close,
+            lag(heikin_ashi.ha_close, 2) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS prev_close,
+            lag(heikin_ashi.ha_close, 3) OVER (PARTITION BY heikin_ashi.code ORDER BY heikin_ashi.idx) AS befr_close,
+                CASE
+                    WHEN heikin_ashi.ha_open < heikin_ashi.ha_close THEN 1
+                    WHEN heikin_ashi.ha_open > heikin_ashi.ha_close THEN '-1'::integer
+                    WHEN heikin_ashi.ha_open = heikin_ashi.ha_close THEN 0
+                    ELSE NULL::integer
+                END AS ha_movement,
+                CASE
+                    WHEN heikin_ashi.ha_high = heikin_ashi.ha_open THEN 1
+                    ELSE 0
+                END AS strong_down,
+                CASE
+                    WHEN heikin_ashi.ha_low = heikin_ashi.ha_open THEN 1
+                    ELSE 0
+                END AS strong_up
+           FROM tier2.heikin_ashi
+        ), output AS (
+         SELECT temp.code,
+            temp.date,
+            temp.idx,
+            temp.strong_down,
+            temp.strong_up,
+            temp.ha_movement AS curr_ha_movement,
+            lag(temp.ha_movement, 1) OVER (PARTITION BY temp.code ORDER BY temp.idx) AS last_ha_movement,
+            temp.curr_open,
+            temp.curr_high,
+            temp.curr_low,
+            temp.curr_close,
+            temp.befr_close,
+            GREATEST(temp.curr_open, temp.last_open, temp.prev_open, temp.befr_open) AS max4_open,
+            LEAST(temp.curr_open, temp.last_open, temp.prev_open, temp.befr_open) AS min4_open,
+            GREATEST(temp.curr_high, temp.last_high, temp.prev_high, temp.befr_high) AS max4_high,
+            LEAST(temp.curr_high, temp.last_high, temp.prev_high, temp.befr_high) AS min4_high,
+            GREATEST(temp.curr_low, temp.last_low, temp.prev_low, temp.befr_low) AS max4_low,
+            LEAST(temp.curr_low, temp.last_low, temp.prev_low, temp.befr_low) AS min4_low,
+            GREATEST(temp.curr_close, temp.last_close, temp.prev_close, temp.befr_close) AS max4_close,
+            LEAST(temp.curr_close, temp.last_close, temp.prev_close, temp.befr_close) AS min4_close
+           FROM temp
+        )
+ SELECT code,
+    date,
+    idx,
+    curr_ha_movement,
+    last_ha_movement,
+    strong_down,
+    strong_up,
+        CASE
+            WHEN (curr_ha_movement = ANY (ARRAY[1, 0])) AND (last_ha_movement = ANY (ARRAY[1, 0])) THEN 1
+            WHEN (curr_ha_movement = ANY (ARRAY['-1'::integer, 0])) AND (last_ha_movement = ANY (ARRAY['-1'::integer, 0])) THEN '-1'::integer
+            ELSE 0
+        END AS duo_ha_movement,
+        CASE
+            WHEN curr_close = max4_close THEN 1
+            ELSE 0
+        END AS new_high,
+        CASE
+            WHEN curr_close = min4_close THEN 1
+            ELSE 0
+        END AS new_low,
+        CASE
+            WHEN befr_close = max4_close THEN 1
+            ELSE 0
+        END AS retrieve_high,
+        CASE
+            WHEN befr_close = min4_close THEN 1
+            ELSE 0
+        END AS retrieve_low
+   FROM output
+  WHERE code::text = 'BHP'::text AND date >= '2023-01-01'::date;
+
+ALTER TABLE tier3.status_heikin_ashi
+    OWNER TO postgres;
+
+
+drop table if exists temp_history;
+create temp table temp_history as 
+select * from tier1.vw_sub_code_history ;
+create index temp_th_idx on temp_history(code, idx);
+
+drop table if exists temp_tech_ind;
+create temp table temp_tech_ind as 
+select * from tier2.vw_technical_indicator;
+create index temp_tti_idx on temp_tech_ind(code,date_idx);
+
+drop table if exists temp_comb;
+create temp table temp_comb as 
+select t.*, h.date, h.open, h.low, h.high, h.close, h.volume
+from temp_history h
+left join temp_tech_ind t
+on h.code = t.code
+and h.idx = t.date_idx;
+create index temp_tc_idx on temp_comb(code,date_idx);
+
+drop table if exists tier3.status_technical_indicator;
+create table tier3.status_technical_indicator as 
+select code, date_idx, date
+	, case when xema > sema then 1 
+		   when xema = sema then 0 
+		   when xema < sema then -1
+	  else null end as xema_sema
+	, case when sema > lema then 1 
+		   when sema = lema then 0 
+		   when sema < lema then -1
+	  else null end as sema_lema
+	, case when lema > tema then 1 
+		   when lema = tema then 0 
+		   when lema < tema then -1
+	  else null end as lema_tema
+	, case when psar >= high then -1
+		   when psar <= low  then 1
+	  else null end as psar_price
+	, case when macd > 0 then 1
+		   when macd < 0 then -1
+		   when macd = 0 then 0
+	  else null end as macd_0
+	, case when scmo > 0 then 1
+		   when scmo < 0 then -1
+		   when scmo = 0 then 0
+	  else null end as scmo_0
+	, case when lcmo > 0 then 1
+		   when lcmo < 0 then -1
+		   when lcmo = 0 then 0
+	  else null end as lcmo_0
+	, case when scmo > lcmo then 1 
+		   when scmo = lcmo then 0 
+		   when scmo < lcmo then -1
+	  else null end as scmo_lcmo
+	  
+	, case when srsi > lrsi then 1 
+		   when srsi = lrsi then 0
+		   when srsi < lrsi then -1 
+	  else null end as srsi_lrsi
+	  
+	, case when srsi > 70  then 1 
+		   when srsi = 70  then 0
+		   when srsi < 70  then -1 
+	  else null end as srsi_70
+	, case when srsi > 30  then 1 
+		   when srsi = 30  then 0
+		   when srsi < 30  then -1 
+	  else null end as srsi_30
+	, case when srsi > 50  then 1 
+		   when srsi = 50  then 0
+		   when srsi < 50  then -1 
+	  else null end as srsi_50
+	, case when lrsi > 70  then 1 
+		   when lrsi = 70  then 0
+		   when lrsi < 70  then -1 
+	  else null end as lrsi_70
+	, case when lrsi > 30  then 1 
+		   when lrsi = 30  then 0
+		   when lrsi < 30  then -1 
+	  else null end as lrsi_30
+	, case when lrsi > 50  then 1 
+		   when lrsi = 50  then 0
+		   when lrsi < 50  then -1 
+	  else null end as lrsi_50
+
+	, case when srsi > srsisema then 1 
+		   when srsi = srsisema then 0
+		   when srsi < srsisema then -1 
+	  else null end as srsi_sema
+	, case when srsi > srsilema then 1 
+		   when srsi = srsilema then 0
+		   when srsi < srsilema then -1 
+	  else null end as srsi_lema	
+	
+	, case when lrsi > lrsisema then 1 
+		   when lrsi = lrsisema then 0
+		   when lrsi < lrsisema then -1 
+	  else null end as lrsi_sema
+	, case when lrsi > lrsilema then 1 
+		   when lrsi = lrsilema then 0
+		   when lrsi < lrsilema then -1 
+	  else null end as lrsi_lema	
+	  
+	, case when scci > lcci then 1 
+		   when scci = lcci then 0
+		   when scci < lcci then -1 
+	  else null end as scci_lcci
+	  
+	, case when scci > 100  then 1 
+		   when scci = 100  then 0
+		   when scci < 100  then -1 
+	  else null end as scci_100
+	, case when scci > -100  then 1 
+		   when scci = -100  then 0
+		   when scci < -100  then -1 
+	  else null end as scci_m100
+	, case when scci > 0  then 1 
+		   when scci = 0  then 0
+		   when scci < 0  then -1 
+	  else null end as scci_0	  
+	  
+	, case when lcci > 100  then 1 
+		   when lcci = 100  then 0
+		   when lcci < 100  then -1 
+	  else null end as lcci_100
+	, case when lcci > -100  then 1 
+		   when lcci = -100  then 0
+		   when lcci < -100  then -1 
+	  else null end as lcci_m100
+	, case when lcci > 0  then 1 
+		   when lcci = 0  then 0
+		   when lcci < 0  then -1 
+	  else null end as lcci_0	  	  
+	  
+	, case when stck > stcd then 1 
+		   when stck = stcd then 0
+		   when stck < stcd then -1 
+	  else null end as stck_stcd
+	  
+	, case when stck > 80  then 1 
+		   when stck = 80  then 0
+		   when stck < 80  then -1 
+	  else null end as stck_80
+	, case when stck > 20  then 1 
+		   when stck = 20  then 0
+		   when stck < 20  then -1 
+	  else null end as stck_20
+	, case when stck > 50  then 1 
+		   when stck = 50  then 0
+		   when stck < 50  then -1 
+	  else null end as stck_50
+	  
+	, case when stcd > 80  then 1 
+		   when stcd = 80  then 0
+		   when stcd < 80  then -1 
+	  else null end as stcd_80
+	, case when stcd > 20  then 1 
+		   when stcd = 20  then 0
+		   when stcd < 20  then -1 
+	  else null end as stcd_20
+	, case when stcd > 50  then 1 
+		   when stcd = 50  then 0
+		   when stcd < 50  then -1 
+	  else null end as stcd_50
+	  
+	, case when cpcv > 0  then 1 
+		   when cpcv = 0  then 0
+		   when cpcv < 0  then -1 
+	  else null end as cpcv_0
+	  
+	, case when sdpo > ldpo then 1 
+		   when sdpo = ldpo then 0
+		   when sdpo < ldpo then -1 
+	  else null end as sdpo_ldpo
+	, case when sdpo > 0  then 1 
+		   when sdpo = 0  then 0
+		   when sdpo < 0  then -1 
+	  else null end as sdpo_0
+	, case when ldpo > 0  then 1 
+		   when ldpo = 0  then 0
+		   when ldpo < 0  then -1 
+	  else null end as ldpo_0
+	, case when gppo > 0  then 1 
+		   when gppo = 0  then 0
+		   when gppo < 0  then -1 
+	  else null end as gppo_0
+	  
+	, case when sroc > lroc then 1 
+		   when sroc = lroc then 0
+		   when sroc < lroc then -1 
+	  else null end as sroc_lroc
+	, case when sroc > 0  then 1 
+		   when sroc = 0  then 0
+		   when sroc < 0  then -1 
+	  else null end as sroc_0
+	, case when lroc > 0  then 1 
+		   when lroc = 0  then 0
+		   when lroc < 0  then -1 
+	  else null end as lroc_0
+	  
+	  	, case when sadx > ladx then 1 
+		   when sadx = ladx then 0
+		   when sadx < ladx then -1 
+	  else null end as sadx_ladx
+	  
+	, case when sstrsi > lstrsi then 1 
+		   when sstrsi = lstrsi then 0
+		   when sstrsi < lstrsi then -1 
+	  else null end as sstrsi_lstrsi
+	  
+	, case when sstrsi > 80  then 1 
+		   when sstrsi = 80  then 0
+		   when sstrsi < 80  then -1 
+	  else null end as sstrsi_80
+	, case when sstrsi > 20  then 1 
+		   when sstrsi = 20  then 0
+		   when sstrsi < 20  then -1 
+	  else null end as sstrsi_20
+	, case when sstrsi > 50  then 1 
+		   when sstrsi = 50  then 0
+		   when sstrsi < 50  then -1 
+	  else null end as sstrsi_50
+	  
+	, case when lstrsi > 80  then 1 
+		   when lstrsi = 80  then 0
+		   when lstrsi < 80  then -1 
+	  else null end as lstrsi_80
+	, case when lstrsi > 20  then 1 
+		   when lstrsi = 20  then 0
+		   when lstrsi < 20  then -1 
+	  else null end as lstrsi_20
+	, case when lstrsi > 50  then 1 
+		   when lstrsi = 50  then 0
+		   when lstrsi < 50  then -1 
+	  else null end as lstrsi_50
+	  
+	  from temp_comb ;
+
