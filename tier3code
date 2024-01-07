@@ -207,11 +207,11 @@ select code, date_idx, date
 	, case when scci > 100  then 1 
 		   when scci = 100  then 0
 		   when scci < 100  then -1 
-	  else null end as scci_100
+	  else null end as scci_p100
 	, case when scci > -100  then 1 
 		   when scci = -100  then 0
 		   when scci < -100  then -1 
-	  else null end as scci_m100
+	  else null end as scci_n100
 	, case when scci > 0  then 1 
 		   when scci = 0  then 0
 		   when scci < 0  then -1 
@@ -220,11 +220,11 @@ select code, date_idx, date
 	, case when lcci > 100  then 1 
 		   when lcci = 100  then 0
 		   when lcci < 100  then -1 
-	  else null end as lcci_100
+	  else null end as lcci_p100
 	, case when lcci > -100  then 1 
 		   when lcci = -100  then 0
 		   when lcci < -100  then -1 
-	  else null end as lcci_m100
+	  else null end as lcci_n100
 	, case when lcci > 0  then 1 
 		   when lcci = 0  then 0
 		   when lcci < 0  then -1 
