@@ -69,6 +69,27 @@ SELECT full_code_history.code,
     row_number() OVER (PARTITION BY full_code_history.code ORDER BY (to_date(full_code_history.date::text, 'MM/DD/YY'::text))) AS idx
    FROM tier1.full_code_history;
 
+drop view if exists tier1.vw_full_code_history_mv;
+CREATE OR REPLACE VIEW tier1.vw_full_code_history_mv
+ AS
+WITH temp AS (
+	SELECT *
+		, lag(close,1, close) over (partition by code order by idx) as last_close
+		, cast (abs (close - lag(close,1, close) over (partition by code order by idx))
+			/lag(close,1, close) over (partition by code order by idx) as numeric(15,5))
+	as mv_diff
+	FROM tier1.vw_full_code_history
+), output as (
+	select code, date, idx, open, high, low, close, volume, mv_diff
+		, avg(mv_diff) OVER (PARTITION BY code ORDER BY idx RANGE BETWEEN 9 PRECEDING AND CURRENT ROW) AS avg_10
+		, max(mv_diff) OVER (PARTITION BY code ORDER BY idx RANGE BETWEEN 9 PRECEDING AND CURRENT ROW) AS max_10
+		, min(mv_diff) OVER (PARTITION BY code ORDER BY idx RANGE BETWEEN 9 PRECEDING AND CURRENT ROW) AS min_10
+	from temp	
+)
+SELECT code, date, idx, open, high, low, close, volume
+	, ((avg_10 * 10::numeric - min_10 - max_10) / 8.0)::numeric(10,5) AS avg_movement
+from output ;
+
 drop view if exists tier1.vw_top_trading;
 create view tier1.vw_top_trading as
 with temp as (
