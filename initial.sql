@@ -435,3 +435,53 @@ ALTER TABLE tier2.vw_technical_indicator
 
 
 
+create view tier2.vw_outcome as 
+with temp as (
+select a.*
+	, a.avg_movement*4 as target4
+	, a.avg_movement*5 as target5
+	, b.idx as tidx, b.high as thigh, b.low as tlow
+	, case when b.high >= a.close * (1+ a.avg_movement*4) then b.idx else 99999 end as reach_h_t4
+	, case when b.low <= a.close * (1- a.avg_movement*4) then b.idx else 99999 end as reach_l_t4
+	, case when b.high >= a.close * (1+ a.avg_movement*5) then b.idx else 99999 end as reach_h_t5
+	, case when b.low <= a.close * (1- a.avg_movement*5) then b.idx else 99999 end as reach_l_t5
+	, case when b.idx -14 = a.idx then cast(abs(b.close / a.close - 1) as numeric(10,5)) else 0 end as final_outcome
+	, case when b.idx -14 = a.idx and b.close > a.close then 1 else 0 end as final_l_flag
+	, case when b.idx -14 = a.idx and b.close < a.close then 1 else 0 end as final_s_flag
+from tier1.vw_full_code_history_mv  a
+inner join tier1.vw_full_code_history_mv  b
+on a.code = b.code 
+where a.idx > b.idx - 15
+and a.idx < b.idx
+), agge as (
+	select code, date, idx, open, high, low, close, volume
+	, avg_movement, target4, target5
+	, min (reach_h_t4) as reach_h_t4
+	, min (reach_l_t4) as reach_l_t4
+	, min (reach_h_t5) as reach_h_t5
+	, min (reach_l_t5) as reach_l_t5
+	, max(final_outcome) as final_outcome
+	, max(final_s_flag) as final_s_flag
+	, max(final_l_flag) as final_l_flag
+from temp
+group by code, date, idx, open, high, low, close, volume, avg_movement, target4, target5
+), output as ( 
+	select code, date, idx, open, high, low, close, volume, avg_movement, target4, target5
+		, max(idx) over (partition by code) as max_idx
+		, reach_h_t4, reach_l_t4, reach_h_t5, reach_l_t5, final_outcome, final_s_flag, final_l_flag
+		, case	when reach_h_t4 < reach_l_t4 then cast(target4 as numeric(10,5))
+				when reach_h_t4 > reach_l_t4 then cast(0-target4 as numeric(10,5))
+				when reach_h_t4 = reach_l_t4 and reach_h_t4 <> 99999 and reach_l_t4 <> 99999 then null
+				when reach_h_t4 = reach_l_t4 and reach_h_t4 = 99999 and final_l_flag = 1 then cast(final_outcome as numeric(10,5))
+				when reach_h_t4 = reach_l_t4 and reach_l_t4 = 99999 and final_s_flag = 1 then cast(0-final_outcome as numeric(10,5))
+		 else cast(0 as numeric(10,5)) end as outcome4
+		 , case	when reach_h_t5 < reach_l_t5 then cast(target5 as numeric(10,5))
+				when reach_h_t5 > reach_l_t5 then cast(0-target5 as numeric(10,5))
+				when reach_h_t5 = reach_l_t5 and reach_h_t5 <> 99999 and reach_l_t5 <> 99999 then null
+				when reach_h_t5 = reach_l_t5 and reach_h_t5 = 99999 and final_l_flag = 1 then cast(final_outcome as numeric(10,5))
+				when reach_h_t5 = reach_l_t5 and reach_l_t5 = 99999 and final_s_flag = 1 then cast(0-final_outcome as numeric(10,5))
+		 else cast(0 as numeric(10,5)) end as outcome5
+	from agge
+)	select code, date, idx, open, high, low, close, volume, outcome4, outcome5 
+from output where idx >5 and max_idx -idx > 15
+			  order by idx;
