@@ -212,6 +212,32 @@ CREATE TABLE IF NOT EXISTS tier2.technical_indicator
    	lstrsi character varying(100) COLLATE pg_catalog."default"
 );
 
+
+ DROP TABLE IF EXISTS tier2.curvfit;
+
+CREATE TABLE IF NOT EXISTS tier2.curvfit
+(
+    symbol character varying COLLATE pg_catalog."default",
+    date_index character varying COLLATE pg_catalog."default",
+    lens character varying COLLATE pg_catalog."default",
+    attr character varying COLLATE pg_catalog."default",
+	linear_1 character varying COLLATE pg_catalog."default",
+	linear_0 character varying COLLATE pg_catalog."default",
+	quadratic_2 character varying COLLATE pg_catalog."default",
+	quadratic_1 character varying COLLATE pg_catalog."default",
+	quadratic_0 character varying COLLATE pg_catalog."default",
+	sine_amplitude character varying COLLATE pg_catalog."default",
+	sine_frequency character varying COLLATE pg_catalog."default",
+	sine_phase character varying COLLATE pg_catalog."default",
+	sine_offset character varying COLLATE pg_catalog."default"
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS tier2.curvfit
+    OWNER to postgres;
+
+
 DROP TABLE IF EXISTS tier2.eavt_source;
 
 CREATE TABLE tier2.eavt_source
